@@ -4,7 +4,7 @@
 # https://github.com/philtr/haystack
 
 # Version of the script
-VERSION="0.1.0"
+VERSION="0.1.1"
 
 # GitHub raw file URL
 GITHUB_RAW_URL="https://raw.githubusercontent.com/philtr/haystack/main/haystack"
