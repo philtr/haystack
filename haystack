@@ -1,0 +1,175 @@
+#!/bin/bash
+
+# Colors from Tailwind CSS
+SLATE_200="#e2e8f0"
+SLATE_300="#cbd5e1"
+SLATE_600="#475569"
+SLATE_700="#334155"
+SLATE_800="#1e293b"
+INDIGO_400="#818cf8"
+INDIGO_500="#6366f1"
+INDIGO_600="#4f46e5"
+WHITE="#ffffff"
+
+# Function to load environment variables from a file
+load_env() {
+	local env_file=$1
+	if [ -f "$env_file" ]; then
+		echo "Loading environment variables from $env_file"
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			if [[ $line =~ ^[^#]+=.* ]]; then
+				var_name="${line%%=*}"
+				var_value="${line#*=}"
+				var_value=$(echo "$var_value" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+				var_value=$(echo "$var_value" | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/")
+				export "$var_name=$var_value"
+				echo "Exported: $var_name=$var_value"
+			fi
+		done <"$env_file"
+	else
+		echo "Environment file $env_file not found. Proceeding without it."
+	fi
+}
+
+# Function to create tmux configuration
+create_tmux_config() {
+	local tmux_conf
+	tmux_conf=$(mktemp)
+	cat <<-EOF >"$tmux_conf"
+		# Set the default terminal and enable mouse support
+		set-option -g default-terminal "screen-256color"
+		set-option -g mouse on
+
+		# Set status bar colors
+		set-option -g status-style "bg=${SLATE_800},fg=${SLATE_300}"
+
+		# Set left side of status bar
+		set-option -g status-left-length 40
+		set-option -g status-left "#[fg=${WHITE},bg=${INDIGO_600},bold] #S #[fg=${INDIGO_600},bg=${SLATE_800},nobold]"
+
+		# Set right side of status bar
+		set-option -g status-right "#[fg=${INDIGO_600},bg=${SLATE_800}]#[fg=${WHITE},bg=${INDIGO_600},bold] %Y-%m-%d %H:%M "
+
+		# Set window styles
+		set-option -g window-status-format " #[fg=${SLATE_600}]#I #[fg=${SLATE_600}]#W "
+		set-option -g window-status-current-format "#[fg=${SLATE_800},bg=${INDIGO_500}]#[fg=${WHITE},bg=${INDIGO_500},bold] #I  #W #[fg=${INDIGO_500},bg=${SLATE_800},nobold]"
+		set-window-option -g window-status-separator ""
+
+		# Set pane border colors
+		set-option -g pane-border-style "fg=${SLATE_600}"
+		set-option -g pane-active-border-style "fg=${INDIGO_400}"
+
+		# Set command line colors
+		set-option -g message-style "fg=${SLATE_200},bg=${SLATE_700}"
+
+		# Keep panes open after exit
+		set-option -g remain-on-exit on
+	EOF
+	echo "$tmux_conf"
+}
+
+# Function to create a script for running a command
+create_command_script() {
+	local name=$1
+	local command=$2
+	local session_name=$3
+	local output_file=$4
+	local temp_script
+	temp_script=$(mktemp)
+
+	cat <<-EOF >"$temp_script"
+		#!/bin/bash
+		echo "Environment variables for $name:"
+		env | sort
+		echo "--------------------------------"
+		trap 'kill 0' SIGINT SIGTERM EXIT
+		echo "Running command: $command"
+		($command) & pid=\$!
+		echo \$pid > /tmp/tmux_${session_name}_${name}_pid
+		wait
+		rm -f /tmp/tmux_${session_name}_${name}_pid
+		echo "Process exited. Press Enter to close this pane."
+		read
+	EOF
+	chmod +x "$temp_script"
+	echo "$temp_script"
+}
+
+# Function to set up termination binding
+setup_termination_binding() {
+	local session_name=$1
+	local output_dir=$2
+	tmux bind-key -T root C-q run-shell "
+        for pid_file in /tmp/tmux_${session_name}_*_pid; do
+            if [ -f \"\$pid_file\" ]; then
+                pid=\$(cat \"\$pid_file\");
+                pkill -P \$pid;
+                kill -SIGINT \$pid 2>/dev/null || kill -SIGTERM \$pid 2>/dev/null;
+                rm -f \"\$pid_file\";
+            fi;
+        done;
+        sleep 2;
+        for pid_file in /tmp/tmux_${session_name}_*_pid; do
+            if [ -f \"\$pid_file\" ]; then
+                pid=\$(cat \"\$pid_file\");
+                pkill -9 -P \$pid;
+                kill -9 \$pid 2>/dev/null;
+                rm -f \"\$pid_file\";
+            fi;
+        done;
+        rm -rf \"$output_dir\";
+        tmux kill-session -t $session_name"
+}
+
+# Function to read Procfile and start processes
+start_processes() {
+	local procfile=$1
+	local session_name
+	session_name=$(basename "$PWD")
+
+	local tmux_conf
+	tmux_conf=$(create_tmux_config)
+	TMUX="" tmux -f "$tmux_conf" new-session -d -s "$session_name"
+
+	# Create a directory for output files
+	local output_dir
+	output_dir=$(mktemp -d)
+
+	# Create the combined output window
+	tmux rename-window -t "$session_name:0" "Combined Output"
+	tmux send-keys -t "$session_name:0" "tail -f $output_dir/*.log" C-m
+
+	local window_index=1
+	while IFS=: read -r name command; do
+		local temp_script
+		local output_file="$output_dir/${name}.log"
+		temp_script=$(create_command_script "$name" "$command" "$session_name" "$output_file")
+		tmux new-window -t "$session_name:$window_index" -n "$name" "$temp_script"
+		tmux pipe-pane -t "$session_name:$window_index" "cat >> $output_file"
+		tmux bind-key -n M-$window_index select-window -t $window_index
+		((window_index++))
+	done <"$procfile"
+
+	setup_termination_binding "$session_name" "$output_dir"
+	rm "$tmux_conf"
+	tmux select-window -t "$session_name:0"
+	tmux attach-session -t "$session_name"
+}
+
+# Main execution
+main() {
+	local procfile
+	procfile=${1:-"Procfile.dev"}
+	if [ ! -f "$procfile" ]; then
+		echo "Specified Procfile '$procfile' not found."
+		exit 1
+	fi
+
+	local env_file=".env.development"
+	[ ! -f "$env_file" ] && env_file=".env"
+
+	load_env "$env_file"
+	start_processes "$procfile"
+}
+
+main "$@"
