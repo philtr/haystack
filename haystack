@@ -83,37 +83,40 @@ create_tmux_config() {
 	echo "$tmux_conf"
 }
 
-# Function to create log processing script
+# Function to create bash log processing script
 create_log_processor() {
 	local script_path=$1
 	cat <<EOF >"$script_path"
-#!/usr/bin/env python3
-import sys
-import time
-import os
+#!/bin/bash
 
-def print_colored(color, text):
-    r, g, b = map(int, color.split(';'))
-    return f"\033[38;2;{r};{g};{b}m{text}\033[0m"
+print_colored() {
+    local color="\$1"
+    local text="\$2"
+    local r g b
+    IFS=';' read -r r g b <<< "\$color"
+    printf "\033[38;2;%s;%s;%sm%s\033[0m" "\$r" "\$g" "\$b" "\$text"
+}
 
-colors = [
-    "16;185;129",   # Emerald-500
-    "245;158;11",   # Amber-500
-    "20;184;166",   # Teal-500
-    "14;165;233",   # Sky-500
-    "99;102;241",   # Indigo-500
-    "244;63;94",    # Rose-500
-    "168;85;247",   # Purple-500
-    "236;72;153",   # Pink-500
-]
+colors=(
+    "16;185;129"   # Emerald-500
+    "245;158;11"   # Amber-500
+    "20;184;166"   # Teal-500
+    "14;165;233"   # Sky-500
+    "99;102;241"   # Indigo-500
+    "244;63;94"    # Rose-500
+    "168;85;247"   # Purple-500
+    "236;72;153"   # Pink-500
+)
 
-name = os.environ.get('PROCFILE_PROCESS_NAME', 'unknown')
-color = colors[hash(name) % len(colors)]
+name="\${PROCFILE_PROCESS_NAME:-unknown}"
+color_index=\$(( \$(echo -n "\$name" | od -An -vtu4 -N4) % \${#colors[@]} ))
+color="\${colors[\$color_index]}"
 
-for line in sys.stdin:
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    colored_prefix = print_colored(color, f"[{timestamp}][{name}]")
-    print(f"{colored_prefix} {line.strip()}", flush=True)
+while IFS= read -r line; do
+    timestamp=\$(date "+%Y-%m-%d %H:%M:%S")
+    colored_prefix=\$(print_colored "\$color" "[\$timestamp][\$name]")
+    printf "%s %s\n" "\$colored_prefix" "\$line"
+done
 EOF
 	chmod +x "$script_path"
 }
@@ -149,7 +152,7 @@ start_processes() {
 	touch "$combined_output_file"
 
 	# Create the log processing script
-	local log_processor_script="$output_dir/log_processor.py"
+	local log_processor_script="$output_dir/log_processor.sh"
 	create_log_processor "$log_processor_script"
 
 	# Create the combined output window as the first window (index 1)
@@ -161,8 +164,8 @@ start_processes() {
 		# Create a new window for each process
 		tmux new-window -t "$session_name:$window_index" -n "$name"
 
-		# Run the command in the window
-		tmux send-keys -t "$session_name:$window_index" "export PROCFILE_PROCESS_NAME=\"$name\"; $command" C-m
+		# Run the command in the window without loading the login shell
+		tmux send-keys -t "$session_name:$window_index" "export PROCFILE_PROCESS_NAME=\"$name\"; exec $command" C-m
 
 		# Set up pipe-pane to capture output
 		tmux pipe-pane -t "$session_name:$window_index" "PROCFILE_PROCESS_NAME=\"$name\" $log_processor_script >> \"$combined_output_file\""
