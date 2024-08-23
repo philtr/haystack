@@ -167,8 +167,21 @@ start_processes() {
 		# Create a new window for each process
 		tmux new-window -t "$session_name:$window_index" -n "$name"
 
-		# Run the command directly in the window
-		tmux send-keys -t "$session_name:$window_index" "export PROCFILE_PROCESS_NAME=\"$name\"; script -q -c \"$command\" /dev/null | tee >(\"$log_processor_script\" >> \"$combined_output_file\")" C-m
+		# Create a named pipe for this process
+		local pipe_file="$output_dir/${name}_pipe"
+		mkfifo "$pipe_file"
+
+		# Start the command in the background, capturing its output
+		(eval "$command" 2>&1 | tee "$pipe_file") &
+
+		# Run the log processor in the background
+		(
+			export PROCFILE_PROCESS_NAME="$name"
+			cat "$pipe_file" | "$log_processor_script" >>"$combined_output_file"
+		) &
+
+		# Display the output in the tmux window
+		tmux send-keys -t "$session_name:$window_index" "cat $pipe_file" C-m
 
 		tmux bind-key -n M-$window_index select-window -t $window_index
 		((window_index++))
