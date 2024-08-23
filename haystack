@@ -203,7 +203,7 @@ setup_termination_binding() {
 	tmux bind-key -T root C-q run-shell "
     tmux display-message 'Shutting down Haystack...' \; \
     # Kill all pane processes
-    tmux list-panes -a -F '#{pane_pid}' | xargs -I{} pkill -P {};
+    tmux list-panes -a -F '#{pane_pid}' | xargs -I{} kill -INT {};
     sleep 2;
     # Force kill any remaining processes
     tmux list-panes -a -F '#{pane_pid}' | xargs -I{} pkill -9 -P {};
