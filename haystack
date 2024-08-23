@@ -95,25 +95,6 @@ setup_termination_binding() {
         tmux kill-session -t $session_name"
 }
 
-# Function to create a log processing script
-create_log_processor() {
-	local name=$1
-	local color=$2
-	local output_file=$3
-	local temp_script
-	temp_script=$(mktemp)
-
-	cat <<EOF >"$temp_script"
-#!/bin/bash
-while IFS= read -r line; do
-    timestamp=\$(date +"%Y-%m-%d %H:%M:%S")
-    printf "\033[${color}m[%s][%s]\033[0m %s\n" "\$timestamp" "$name" "\$line"
-done >> "$output_file"
-EOF
-	chmod +x "$temp_script"
-	echo "$temp_script"
-}
-
 # Function to read Procfile and start processes
 start_processes() {
 	local procfile=$1
@@ -142,12 +123,11 @@ start_processes() {
 		# Create a new window for each process
 		tmux new-window -t "$session_name:$window_index" -n "$name"
 
-		# Create a log processing script for this process
-		local log_processor
-		log_processor=$(create_log_processor "$name" "${COLORS[$color_index]}" "$combined_output_file")
+		# Run the command directly in the window
+		tmux send-keys -t "$session_name:$window_index" "$command" C-m
 
-		# Run the command and pipe its output through the log processor
-		tmux send-keys -t "$session_name:$window_index" "$command 2>&1 | $log_processor" C-m
+		# Set up pipe-pane to capture output with timestamp and colorized prefix
+		tmux pipe-pane -t "$session_name:$window_index" "while read line; do printf \"\033[${COLORS[$color_index]}m[%s][%s]\033[0m %s\n\" \"\$(date +\"%Y-%m-%d %H:%M:%S\")\" \"$name\" \"\$line\"; done >> $combined_output_file"
 
 		tmux bind-key -n M-$window_index select-window -t $window_index
 		((window_index++))
