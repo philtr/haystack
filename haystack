@@ -25,7 +25,8 @@ GREEN_500="#22c55e"
 # Function to update the script
 update_script() {
 	echo "Updating Haystack..."
-	local temp_file=$(mktemp)
+	local temp_file
+	temp_file=$(mktemp)
 	if curl -sS "$GITHUB_RAW_URL" -o "$temp_file"; then
 		if [[ -s "$temp_file" ]]; then
 			local current_file="$0"
@@ -245,8 +246,8 @@ start_processes() {
 main() {
 	# Check for --update flag
 	if [[ "$1" == "--update" ]]; then
+		# run the update script and exit
 		update_script
-		return
 	fi
 
 	# Check for --version flag
