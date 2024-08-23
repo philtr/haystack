@@ -4,7 +4,7 @@
 # https://github.com/philtr/haystack
 
 # Version of the script
-VERSION="1.0.0"
+VERSION="0.1.0"
 
 # GitHub raw file URL
 GITHUB_RAW_URL="https://raw.githubusercontent.com/philtr/haystack/main/haystack"
@@ -20,6 +20,7 @@ INDIGO_400="#818cf8"
 INDIGO_500="#6366f1"
 INDIGO_600="#4f46e5"
 WHITE="#ffffff"
+GREEN_500="#22c55e"
 
 # Function to update the script
 update_script() {
@@ -86,12 +87,13 @@ create_tmux_config() {
 		# Set status bar colors
 		set-option -g status-style "bg=${SLATE_800},fg=${SLATE_300}"
 
-		# Set left side of status bar
+		# Set left side of status bar (session name with green background)
 		set-option -g status-left-length 40
-		set-option -g status-left "#[fg=${WHITE},bg=${INDIGO_600},bold] #S #[fg=${INDIGO_600},bg=${SLATE_800},nobold]"
+		set-option -g status-left "#[fg=${SLATE_800},bg=${GREEN_500},bold] #S #[fg=${GREEN_500},bg=${SLATE_800},nobold]"
 
-		# Set right side of status bar
-		set-option -g status-right "#[fg=${INDIGO_600},bg=${SLATE_800}]#[fg=${WHITE},bg=${INDIGO_600},bold] %Y-%m-%d %H:%M "
+		# Set right side of status bar (quit instructions and Haystack version with indigo background)
+		set-option -g status-right-length 60
+		set-option -g status-right "#[fg=${INDIGO_600}]Ctrl+Q to quit #[fg=${WHITE},bg=${INDIGO_600},bold] Haystack v${VERSION} "
 
 		# Set window styles
 		set-option -g window-status-format " #[fg=${SLATE_600}]#I #[fg=${SLATE_600}]#W "
