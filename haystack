@@ -163,6 +163,7 @@ setup_termination_binding() {
 	local session_name=$1
 	local output_dir=$2
 	tmux bind-key -T root C-q run-shell "
+    tmux display-message 'Shutting down Haystack...' \; \
     # Kill all pane processes
     tmux list-panes -a -F '#{pane_pid}' | xargs -I{} pkill -P {};
     sleep 2;
