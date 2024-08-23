@@ -13,14 +13,14 @@ WHITE="#ffffff"
 
 # Define an array of colors for process prefixes (Tailwind-inspired)
 COLORS=(
-	"38;2;16;185;129" # Emerald-500
-	"38;2;245;158;11" # Amber-500
-	"38;2;20;184;166" # Teal-500
-	"38;2;14;165;233" # Sky-500
-	"38;2;99;102;241" # Indigo-500
-	"38;2;244;63;94"  # Rose-500
-	"38;2;168;85;247" # Purple-500
-	"38;2;236;72;153" # Pink-500
+	"16;185;129" # Emerald-500
+	"245;158;11" # Amber-500
+	"20;184;166" # Teal-500
+	"14;165;233" # Sky-500
+	"99;102;241" # Indigo-500
+	"244;63;94"  # Rose-500
+	"168;85;247" # Purple-500
+	"236;72;153" # Pink-500
 )
 
 # Function to load environment variables from a file
@@ -83,6 +83,41 @@ create_tmux_config() {
 	echo "$tmux_conf"
 }
 
+# Function to create log processing script
+create_log_processor() {
+	local script_path=$1
+	cat <<EOF >"$script_path"
+#!/usr/bin/env python3
+import sys
+import time
+import os
+
+def print_colored(color, text):
+    r, g, b = map(int, color.split(';'))
+    return f"\033[38;2;{r};{g};{b}m{text}\033[0m"
+
+colors = [
+    "16;185;129",   # Emerald-500
+    "245;158;11",   # Amber-500
+    "20;184;166",   # Teal-500
+    "14;165;233",   # Sky-500
+    "99;102;241",   # Indigo-500
+    "244;63;94",    # Rose-500
+    "168;85;247",   # Purple-500
+    "236;72;153",   # Pink-500
+]
+
+name = os.environ.get('PROCFILE_PROCESS_NAME', 'unknown')
+color = colors[hash(name) % len(colors)]
+
+for line in sys.stdin:
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    colored_prefix = print_colored(color, f"[{timestamp}][{name}]")
+    print(f"{colored_prefix} {line.strip()}", flush=True)
+EOF
+	chmod +x "$script_path"
+}
+
 # Function to set up termination binding
 setup_termination_binding() {
 	local session_name=$1
@@ -113,25 +148,24 @@ start_processes() {
 	local combined_output_file="$output_dir/combined_output.log"
 	touch "$combined_output_file"
 
+	# Create the log processing script
+	local log_processor_script="$output_dir/log_processor.py"
+	create_log_processor "$log_processor_script"
+
 	# Create the combined output window as the first window (index 1)
 	tmux new-window -t "$session_name:1" -n "all"
 	tmux send-keys -t "$session_name:1" "tail -f $combined_output_file" C-m
 
 	local window_index=2
-	local color_index=0
 	while IFS=: read -r name command; do
 		# Create a new window for each process
 		tmux new-window -t "$session_name:$window_index" -n "$name"
 
-		# Run the command directly in the window
-		tmux send-keys -t "$session_name:$window_index" "$command" C-m
-
-		# Set up pipe-pane to capture output with timestamp and colorized prefix
-		tmux pipe-pane -t "$session_name:$window_index" "while read line; do printf \"\033[${COLORS[$color_index]}m[%s][%s]\033[0m %s\n\" \"\$(date +\"%Y-%m-%d %H:%M:%S\")\" \"$name\" \"\$line\"; done >> $combined_output_file"
+		# Run the command and pipe its output through the log processor
+		tmux send-keys -t "$session_name:$window_index" "export PROCFILE_PROCESS_NAME=\"$name\"; $command 2>&1 | $log_processor_script | tee -a $combined_output_file" C-m
 
 		tmux bind-key -n M-$window_index select-window -t $window_index
 		((window_index++))
-		((color_index = (color_index + 1) % ${#COLORS[@]}))
 	done <"$procfile"
 
 	# Bind Alt-1 to select the "all" window
