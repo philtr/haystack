@@ -11,18 +11,6 @@ INDIGO_500="#6366f1"
 INDIGO_600="#4f46e5"
 WHITE="#ffffff"
 
-# Define an array of colors for process prefixes (Tailwind-inspired)
-COLORS=(
-	"16;185;129" # Emerald-500
-	"245;158;11" # Amber-500
-	"20;184;166" # Teal-500
-	"14;165;233" # Sky-500
-	"99;102;241" # Indigo-500
-	"244;63;94"  # Rose-500
-	"168;85;247" # Purple-500
-	"236;72;153" # Pink-500
-)
-
 # Function to load environment variables from a file
 load_env() {
 	local env_file=$1
@@ -44,37 +32,37 @@ create_tmux_config() {
 	local tmux_conf
 	tmux_conf=$(mktemp)
 	cat <<-EOF >"$tmux_conf"
-		        # Set the default terminal and enable mouse support
-		        set-option -g default-terminal "screen-256color"
-		        set-option -g mouse on
+		# Set the default terminal and enable mouse support
+		set-option -g default-terminal "screen-256color"
+		set-option -g mouse on
 
-		        # Prevent tmux from renaming windows automatically
-		        set-option -g allow-rename off
+		# Prevent tmux from renaming windows automatically
+		set-option -g allow-rename off
 
-		        # Set status bar colors
-		        set-option -g status-style "bg=${SLATE_800},fg=${SLATE_300}"
+		# Set status bar colors
+		set-option -g status-style "bg=${SLATE_800},fg=${SLATE_300}"
 
-		        # Set left side of status bar
-		        set-option -g status-left-length 40
-		        set-option -g status-left "#[fg=${WHITE},bg=${INDIGO_600},bold] #S #[fg=${INDIGO_600},bg=${SLATE_800},nobold]"
+		# Set left side of status bar
+		set-option -g status-left-length 40
+		set-option -g status-left "#[fg=${WHITE},bg=${INDIGO_600},bold] #S #[fg=${INDIGO_600},bg=${SLATE_800},nobold]"
 
-		        # Set right side of status bar
-		        set-option -g status-right "#[fg=${INDIGO_600},bg=${SLATE_800}]#[fg=${WHITE},bg=${INDIGO_600},bold] %Y-%m-%d %H:%M "
+		# Set right side of status bar
+		set-option -g status-right "#[fg=${INDIGO_600},bg=${SLATE_800}]#[fg=${WHITE},bg=${INDIGO_600},bold] %Y-%m-%d %H:%M "
 
-		        # Set window styles
-		        set-option -g window-status-format " #[fg=${SLATE_600}]#I #[fg=${SLATE_600}]#W "
-		        set-option -g window-status-current-format "#[fg=${SLATE_800},bg=${INDIGO_500}]#[fg=${WHITE},bg=${INDIGO_500},bold] #I  #W #[fg=${INDIGO_500},bg=${SLATE_800},nobold]"
-		        set-window-option -g window-status-separator ""
+		# Set window styles
+		set-option -g window-status-format " #[fg=${SLATE_600}]#I #[fg=${SLATE_600}]#W "
+		set-option -g window-status-current-format "#[fg=${SLATE_800},bg=${INDIGO_500}]#[fg=${WHITE},bg=${INDIGO_500},bold] #I  #W #[fg=${INDIGO_500},bg=${SLATE_800},nobold]"
+		set-window-option -g window-status-separator ""
 
-		        # Set pane border colors
-		        set-option -g pane-border-style "fg=${SLATE_600}"
-		        set-option -g pane-active-border-style "fg=${INDIGO_400}"
+		# Set pane border colors
+		set-option -g pane-border-style "fg=${SLATE_600}"
+		set-option -g pane-active-border-style "fg=${INDIGO_400}"
 
-		        # Set command line colors
-		        set-option -g message-style "fg=${SLATE_200},bg=${SLATE_700}"
+		# Set command line colors
+		set-option -g message-style "fg=${SLATE_200},bg=${SLATE_700}"
 
-		        # Keep panes open after exit
-		        set-option -g remain-on-exit on
+		# Keep panes open after exit
+		set-option -g remain-on-exit on
 	EOF
 	echo "$tmux_conf"
 }
@@ -82,38 +70,38 @@ create_tmux_config() {
 # Function to create bash log processing script
 create_log_processor() {
 	local script_path=$1
-	cat <<EOF >"$script_path"
-#!/bin/bash
+	cat <<-EOF >"$script_path"
+		#!/bin/bash
 
-print_colored() {
-    local color="\$1"
-    local text="\$2"
-    local r g b
-    IFS=';' read -r r g b <<< "\$color"
-    printf "\033[38;2;%s;%s;%sm%s\033[0m" "\$r" "\$g" "\$b" "\$text"
-}
+		print_colored() {
+		    local color="\$1"
+		    local text="\$2"
+		    local r g b
+		    IFS=';' read -r r g b <<< "\$color"
+		    printf "\033[38;2;%s;%s;%sm%s\033[0m" "\$r" "\$g" "\$b" "\$text"
+		}
 
-colors=(
-    "16;185;129"   # Emerald-500
-    "245;158;11"   # Amber-500
-    "20;184;166"   # Teal-500
-    "14;165;233"   # Sky-500
-    "99;102;241"   # Indigo-500
-    "244;63;94"    # Rose-500
-    "168;85;247"   # Purple-500
-    "236;72;153"   # Pink-500
-)
+		colors=(
+		    "16;185;129"   # Emerald-500
+		    "245;158;11"   # Amber-500
+		    "20;184;166"   # Teal-500
+		    "14;165;233"   # Sky-500
+		    "99;102;241"   # Indigo-500
+		    "244;63;94"    # Rose-500
+		    "168;85;247"   # Purple-500
+		    "236;72;153"   # Pink-500
+		)
 
-name="\${PROCFILE_PROCESS_NAME:-unknown}"
-color_index=\$(( \$(echo -n "\$name" | od -An -vtu4 -N4) % \${#colors[@]} ))
-color="\${colors[\$color_index]}"
+		name="\${PROCFILE_PROCESS_NAME:-unknown}"
+		color_index=\$(( \$(echo -n "\$name" | od -An -vtu4 -N4) % \${#colors[@]} ))
+		color="\${colors[\$color_index]}"
 
-while IFS= read -r line; do
-    timestamp=\$(date "+%Y-%m-%d %H:%M:%S")
-    colored_prefix=\$(print_colored "\$color" "[\$timestamp][\$name]")
-    printf "%s %s\n" "\$colored_prefix" "\$line"
-done
-EOF
+		while IFS= read -r line; do
+		    timestamp=\$(date "+%Y-%m-%d %H:%M:%S")
+		    colored_prefix=\$(print_colored "\$color" "[\$timestamp][\$name]")
+		    printf "%s %s\n" "\$colored_prefix" "\$line"
+		done
+	EOF
 	chmod +x "$script_path"
 }
 
