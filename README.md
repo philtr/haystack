@@ -34,7 +34,7 @@ that ships with [Ruby on Rails][rails].
 
 💁‍♂️ **TL;DR**: You need bash, tmux, curl, sed, and sort installed on your system.
 
-- For macOS: `brew install tmux curl coreutils``
+- For macOS: `brew install tmux curl coreutils`
 - For Ubuntu/Debian: `sudo apt-get install tmux curl`
 
 ---
@@ -147,7 +147,6 @@ issue](https://github.com/philtr/haystack/issues) on the GitHub repository.
 
 ## AI Disclaimer
 
-**Important**: This entire project, including all code and documentation, was
-generated using AI. While efforts have been made to ensure functionality and
-safety, users should use this software at their own risk. Always review and test
-thoroughly before using in any critical environments.
+**PLEASE NOTE**: This project was almost entirely generated using AI. While efforts have
+been made to ensure functionality and safety, users should use this software at their own
+risk. Always review and test thoroughly before using in any critical environments. 
