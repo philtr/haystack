@@ -1,6 +1,12 @@
 #!/bin/bash
 
+# This script is a sophisticated tmux-based process management tool designed for
+# managing multiple processes in a development environment. It reads process
+# definitions from a Procfile, sets up a tmux session with separate windows for
+# each process, and provides a combined output view.
+
 # Colors from Tailwind CSS
+# These color codes are used for styling the tmux interface
 SLATE_200="#e2e8f0"
 SLATE_300="#cbd5e1"
 SLATE_600="#475569"
@@ -12,15 +18,20 @@ INDIGO_600="#4f46e5"
 WHITE="#ffffff"
 
 # Function to load environment variables from a file
+# This allows the script to use environment-specific configurations
 load_env() {
 	local env_file=$1
 	if [ -f "$env_file" ]; then
 		while IFS= read -r line || [[ -n "$line" ]]; do
+			# Process non-comment lines containing key-value pairs
 			if [[ $line =~ ^[^#]+=.* ]]; then
 				var_name="${line%%=*}"
 				var_value="${line#*=}"
+				# Trim leading and trailing whitespace
 				var_value=$(echo "$var_value" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+				# Remove surrounding quotes if present
 				var_value=$(echo "$var_value" | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/")
+				# Export the environment variable
 				export "$var_name=$var_value"
 			fi
 		done <"$env_file"
@@ -28,6 +39,7 @@ load_env() {
 }
 
 # Function to create tmux configuration
+# This generates a temporary tmux config file with custom styling and key bindings
 create_tmux_config() {
 	local tmux_conf
 	tmux_conf=$(mktemp)
@@ -68,11 +80,13 @@ create_tmux_config() {
 }
 
 # Function to create bash log processing script
+# This script colorizes and formats the output from each process
 create_log_processor() {
 	local script_path=$1
 	cat <<-EOF >"$script_path"
 		#!/bin/bash
 
+		# Function to print colored text
 		print_colored() {
 		    local color="\$1"
 		    local text="\$2"
@@ -81,6 +95,7 @@ create_log_processor() {
 		    printf "\033[38;2;%s;%s;%sm%s\033[0m" "\$r" "\$g" "\$b" "\$text"
 		}
 
+		# Array of colors for different processes
 		colors=(
 		    "16;185;129"   # Emerald-500
 		    "245;158;11"   # Amber-500
@@ -92,10 +107,13 @@ create_log_processor() {
 		    "236;72;153"   # Pink-500
 		)
 
+		# Get process name from environment variable or use "unknown"
 		name="\${PROCFILE_PROCESS_NAME:-unknown}"
+		# Choose a color based on the process name
 		color_index=\$(( \$(echo -n "\$name" | od -An -vtu4 -N4) % \${#colors[@]} ))
 		color="\${colors[\$color_index]}"
 
+		# Process each line of input
 		while IFS= read -r line; do
 		    timestamp=\$(date "+%Y-%m-%d %H:%M:%S")
 		    colored_prefix=\$(print_colored "\$color" "[\$timestamp][\$name]")
@@ -106,28 +124,36 @@ create_log_processor() {
 }
 
 # Function to set up termination binding
+# This creates a key binding (Ctrl+Q) to gracefully terminate all processes and clean up
 setup_termination_binding() {
 	local session_name=$1
 	local output_dir=$2
 	tmux bind-key -T root C-q run-shell "
-        tmux list-panes -a -F '#{pane_pid}' | xargs -I{} pkill -P {};
-        sleep 2;
-        tmux list-panes -a -F '#{pane_pid}' | xargs -I{} pkill -9 -P {};
-        rm -rf \"$output_dir\";
-        tmux kill-session -t $session_name"
+    # Kill all pane processes
+    tmux list-panes -a -F '#{pane_pid}' | xargs -I{} pkill -P {};
+    sleep 2;
+    # Force kill any remaining processes
+    tmux list-panes -a -F '#{pane_pid}' | xargs -I{} pkill -9 -P {};
+    # Remove temporary output directory
+    rm -rf \"$output_dir\";
+    # Kill the tmux session
+    tmux kill-session -t $session_name"
 }
 
 # Function to read Procfile and start processes
+# This is the core function that sets up the tmux environment and starts all processes
 start_processes() {
 	local procfile=$1
 	local session_name
 	session_name=$(basename "$PWD")
 
+	# Create tmux configuration
 	local tmux_conf
 	tmux_conf=$(create_tmux_config)
+	# Start a new detached tmux session
 	TMUX="" tmux -f "$tmux_conf" new-session -d -s "$session_name"
 
-	# Create a directory for output files
+	# Create a temporary directory for output files
 	local output_dir
 	output_dir=$(mktemp -d)
 
@@ -144,24 +170,29 @@ start_processes() {
 	tmux send-keys -t "$session_name:1" "tail -f $combined_output_file" C-m
 
 	local window_index=2
+	# Read the Procfile and create windows for each process
 	while IFS=: read -r name command; do
 		# Create a new window for each process
 		tmux new-window -t "$session_name:$window_index" -n "$name"
 
-		# Run the command in the window without loading the login shell
+		# Run the command in the window
 		tmux send-keys -t "$session_name:$window_index" "PROCFILE_PROCESS_NAME=\"$name\" $command" C-m
 
-		# Set up pipe-pane to capture output
+		# Set up pipe-pane to capture and process output
 		tmux pipe-pane -t "$session_name:$window_index" "PROCFILE_PROCESS_NAME=\"$name\" $log_processor_script >> \"$combined_output_file\""
 
+		# Bind Alt+window_index to select the window
 		tmux bind-key -n M-$window_index select-window -t $window_index
 		((window_index++))
 	done <"$procfile"
 
-	# Bind Alt-1 to select the "all" window
+	# Bind Alt+1 to select the "all" window
 	tmux bind-key -n M-1 select-window -t 1
 
+	# Set up termination binding
 	setup_termination_binding "$session_name" "$output_dir"
+
+	# Clean up temporary tmux config file
 	rm "$tmux_conf"
 
 	# Remove the initial window (index 0)
@@ -169,10 +200,13 @@ start_processes() {
 
 	# Select the "all" window (now index 1)
 	tmux select-window -t "$session_name:1"
+
+	# Attach to the tmux session
 	tmux attach-session -t "$session_name"
 }
 
-# Main execution
+# Main execution function
+# This function ties everything together, determining which Procfile and environment file to use
 main() {
 	local procfile
 	procfile=${1:-"Procfile.dev"}
@@ -181,11 +215,16 @@ main() {
 		exit 1
 	fi
 
+	# Determine which environment file to use
 	local env_file=".env.development"
 	[ ! -f "$env_file" ] && env_file=".env"
 
+	# Load environment variables
 	load_env "$env_file"
+
+	# Start processes defined in the Procfile
 	start_processes "$procfile"
 }
 
+# Execute the main function with provided arguments
 main "$@"
