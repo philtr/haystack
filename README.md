@@ -5,6 +5,11 @@ streamlining development environments. It allows you to easily manage multiple
 processes defined in a Procfile, providing a clean and efficient interface for
 monitoring and controlling your development stack.
 
+Haystack was designed to be a relatively drop-in replacement for the `bin/dev`
+that ships with [Ruby on Rails][rails].
+
+[rails]: https://rubyonrails.org/
+
 ![Haystack Screenshot](./doc/haystack-screenshot.png)
 
 ## Features
