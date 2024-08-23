@@ -70,11 +70,12 @@ that ships with [Ruby on Rails][rails].
 
 ## Updating Haystack
 
-To update Haystack to the latest version, run:
+Haystack can be updated using the following commands:
 
-```sh
-haystack --update
-```
+- `bin/haystack --update`: Checks for updates and installs a new version if
+  available.
+- `bin/haystack --update --force`: Forces an update to the latest version, even
+  if it's not newer than the current version.
 
 ## Configuration
 

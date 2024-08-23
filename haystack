@@ -34,6 +34,11 @@ extract_version() {
 
 # Function to update the script
 update_script() {
+	local force_update=false
+	if [[ "$1" == "--force" ]]; then
+		force_update=true
+	fi
+
 	echo "Checking for updates..."
 	local temp_file
 	temp_file=$(mktemp)
@@ -49,8 +54,12 @@ update_script() {
 				exit 1
 			fi
 
-			if version_gt "$new_version" "$current_version"; then
-				echo "New version $new_version available. Current version is $current_version."
+			if $force_update || version_gt "$new_version" "$current_version"; then
+				if $force_update; then
+					echo "Force updating from version $current_version to $new_version."
+				else
+					echo "New version $new_version available. Current version is $current_version."
+				fi
 				if mv "$temp_file" "$current_file"; then
 					chmod +x "$current_file"
 					echo "Haystack has been updated successfully to version $new_version."
@@ -61,7 +70,7 @@ update_script() {
 					exit 1
 				fi
 			else
-				echo "Current version $current_version is up to date."
+				echo "Current version $current_version is up to date. Use '--update --force' to force an update."
 				rm "$temp_file"
 				exit 0
 			fi
@@ -270,10 +279,13 @@ start_processes() {
 # Main execution function
 # This function ties everything together, determining which Procfile and environment file to use
 main() {
-	# Check for --update flag
+	# Check for update flags
 	if [[ "$1" == "--update" ]]; then
-		# run the update script and exit
-		update_script
+		if [[ "$2" == "--force" ]]; then
+			update_script --force
+		else
+			update_script
+		fi
 	fi
 
 	# Check for --version flag
