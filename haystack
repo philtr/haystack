@@ -40,6 +40,9 @@ create_tmux_config() {
 		set-option -g default-terminal "screen-256color"
 		set-option -g mouse on
 
+		# Prevent tmux from renaming windows automatically
+		set-option -g allow-rename off
+
 		# Set status bar colors
 		set-option -g status-style "bg=${SLATE_800},fg=${SLATE_300}"
 
@@ -82,14 +85,10 @@ create_command_script() {
 		echo "Environment variables for $name:"
 		env | sort
 		echo "--------------------------------"
-		trap 'kill 0' SIGINT SIGTERM EXIT
 		echo "Running command: $command"
-		($command) & pid=\$!
-		echo \$pid > /tmp/tmux_${session_name}_${name}_pid
-		wait
-		rm -f /tmp/tmux_${session_name}_${name}_pid
-		echo "Process exited. Press Enter to close this pane."
-		read
+
+		# Use eval to properly handle environment variables and the command
+		eval "$command"
 	EOF
 	chmod +x "$temp_script"
 	echo "$temp_script"
@@ -135,24 +134,42 @@ start_processes() {
 	local output_dir
 	output_dir=$(mktemp -d)
 
-	# Create the combined output window
-	tmux rename-window -t "$session_name:0" "Combined Output"
-	tmux send-keys -t "$session_name:0" "tail -f $output_dir/*.log" C-m
+	# Create empty log files for each process
+	while IFS=: read -r name _; do
+		touch "$output_dir/${name}.log"
+	done <"$procfile"
 
-	local window_index=1
+	# Create the combined output window as the first window (index 1)
+	tmux new-window -t "$session_name:1" -n "all"
+	tmux send-keys -t "$session_name:1" "tail -f $output_dir/*.log" C-m
+
+	local window_index=2
 	while IFS=: read -r name command; do
 		local temp_script
 		local output_file="$output_dir/${name}.log"
 		temp_script=$(create_command_script "$name" "$command" "$session_name" "$output_file")
-		tmux new-window -t "$session_name:$window_index" -n "$name" "$temp_script"
-		tmux pipe-pane -t "$session_name:$window_index" "cat >> $output_file"
+
+		# Create a new window for each process
+		tmux new-window -t "$session_name:$window_index" -n "$name"
+
+		# Run the command directly in the window
+		tmux send-keys -t "$session_name:$window_index" "$temp_script 2>&1 | tee -a $output_file" C-m
+
 		tmux bind-key -n M-$window_index select-window -t $window_index
 		((window_index++))
 	done <"$procfile"
 
+	# Bind Alt-1 to select the "all" window
+	tmux bind-key -n M-1 select-window -t 1
+
 	setup_termination_binding "$session_name" "$output_dir"
 	rm "$tmux_conf"
-	tmux select-window -t "$session_name:0"
+
+	# Remove the initial window (index 0)
+	tmux kill-window -t "$session_name:0"
+
+	# Select the "all" window (now index 1)
+	tmux select-window -t "$session_name:1"
 	tmux attach-session -t "$session_name"
 }
 
