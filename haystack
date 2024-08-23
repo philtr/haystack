@@ -91,7 +91,6 @@ create_log_processor() {
 import sys
 import time
 import os
-import select
 
 def print_colored(color, text):
     r, g, b = map(int, color.split(';'))
@@ -111,15 +110,10 @@ colors = [
 name = os.environ.get('PROCFILE_PROCESS_NAME', 'unknown')
 color = colors[hash(name) % len(colors)]
 
-while True:
-    ready, _, _ = select.select([sys.stdin], [], [], 0.1)
-    if ready:
-        line = sys.stdin.readline()
-        if not line:
-            break
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        colored_prefix = print_colored(color, f"[{timestamp}][{name}]")
-        print(f"{colored_prefix} {line.strip()}", flush=True)
+for line in sys.stdin:
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    colored_prefix = print_colored(color, f"[{timestamp}][{name}]")
+    print(f"{colored_prefix} {line.strip()}", flush=True)
 EOF
 	chmod +x "$script_path"
 }
@@ -167,21 +161,11 @@ start_processes() {
 		# Create a new window for each process
 		tmux new-window -t "$session_name:$window_index" -n "$name"
 
-		# Create a named pipe for this process
-		local pipe_file="$output_dir/${name}_pipe"
-		mkfifo "$pipe_file"
+		# Run the command in the window
+		tmux send-keys -t "$session_name:$window_index" "export PROCFILE_PROCESS_NAME=\"$name\"; $command" C-m
 
-		# Start the command in the background, capturing its output
-		(eval "$command" 2>&1 | tee "$pipe_file") &
-
-		# Run the log processor in the background
-		(
-			export PROCFILE_PROCESS_NAME="$name"
-			cat "$pipe_file" | "$log_processor_script" >>"$combined_output_file"
-		) &
-
-		# Display the output in the tmux window
-		tmux send-keys -t "$session_name:$window_index" "cat $pipe_file" C-m
+		# Set up pipe-pane to capture output
+		tmux pipe-pane -t "$session_name:$window_index" "PROCFILE_PROCESS_NAME=\"$name\" $log_processor_script >> \"$combined_output_file\""
 
 		tmux bind-key -n M-$window_index select-window -t $window_index
 		((window_index++))
