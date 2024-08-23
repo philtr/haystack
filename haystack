@@ -4,7 +4,7 @@
 # https://github.com/philtr/haystack
 
 # Version of the script
-VERSION="0.1.1"
+VERSION="0.2.0"
 
 # GitHub raw file URL
 GITHUB_RAW_URL="https://raw.githubusercontent.com/philtr/haystack/main/haystack"
@@ -45,8 +45,10 @@ update_script() {
 	if curl -sS "$GITHUB_RAW_URL" -o "$temp_file"; then
 		if [[ -s "$temp_file" ]]; then
 			local current_file="$0"
-			local current_version=$(extract_version "$current_file")
-			local new_version=$(extract_version "$temp_file")
+			local current_version
+			current_version=$(extract_version "$current_file")
+			local new_version
+			new_version=$(extract_version "$temp_file")
 
 			if [[ -z "$current_version" || -z "$new_version" ]]; then
 				echo "Error: Unable to extract version information."
