@@ -239,17 +239,13 @@ start_processes() {
 	create_log_processor "$log_processor_script"
 
 	# Create the combined output window as the first window (index 1)
-	tmux new-window -t "$session_name:1" -n "all"
-	tmux send-keys -t "$session_name:1" "tail -f $combined_output_file" C-m
+	tmux new-window -t "$session_name:1" -n "all" "tail -f $combined_output_file"
 
 	local window_index=2
 	# Read the Procfile and create windows for each process
 	while IFS=: read -r name command; do
 		# Create a new window for each process
-		tmux new-window -t "$session_name:$window_index" -n "$name"
-
-		# Run the command in the window
-		tmux send-keys -t "$session_name:$window_index" "PROCFILE_PROCESS_NAME=\"$name\" $command" C-m
+		tmux new-window -t "$session_name:$window_index" -n "$name" "PROCFILE_PROCESS_NAME=\"$name\" $command"
 
 		# Set up pipe-pane to capture and process output
 		tmux pipe-pane -t "$session_name:$window_index" "PROCFILE_PROCESS_NAME=\"$name\" $log_processor_script >> \"$combined_output_file\""
