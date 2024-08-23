@@ -1,4 +1,4 @@
-# Haystack
+# 🚜 Haystack
 
 Haystack is a powerful tmux-based process management tool designed for
 streamlining development environments. It allows you to easily manage multiple
@@ -29,6 +29,52 @@ that ships with [Ruby on Rails][rails].
   combination (Ctrl+Q).
 - **Self-Update Mechanism**: Easily update Haystack to the latest version with a
   simple command.
+
+## Requirements
+
+💁‍♂️ **TL;DR**: You need bash, tmux, curl, sed, and sort installed on your system.
+
+- For macOS: `brew install tmux curl coreutils``
+- For Ubuntu/Debian: `sudo apt-get install tmux curl`
+
+---
+
+To use Haystack effectively, you need to have the following installed on your
+system:
+
+1. **Bash**: Haystack is a Bash script and requires a Bash shell to run. Most
+   Unix-like systems (Linux, macOS) have Bash installed by default.
+
+2. **tmux**: Haystack relies heavily on tmux for process management and
+  interface creation. Make sure you have tmux installed and accessible from your
+  command line.
+   - On macOS: You can install tmux using Homebrew with `brew install tmux`
+   - On Ubuntu/Debian: Install using `sudo apt-get install tmux`
+   - On other systems: Check your package manager or the [tmux GitHub
+   page](https://github.com/tmux/tmux) for installation instructions.
+
+3. **curl**: Used for downloading updates. It comes pre-installed on most
+  systems, but if you don't have it:
+   - On macOS: It should be pre-installed. If not, you can install it with
+   Homebrew: `brew install curl`
+   - On Ubuntu/Debian: Install using `sudo apt-get install curl`
+
+4. **sed**: Used for text processing. It's typically pre-installed on Unix-like systems.
+
+5. **sort**: Used for version comparison. The GNU version of sort with `-V`
+  option is preferred. It's typically pre-installed on Linux  systems.
+   - On macOS: The default `sort` might not support `-V`. You can install GNU
+   coreutils (which includes `gsort`) with Homebrew: `brew install coreutils`
+
+### Compatibility
+
+Haystack is designed to work on Unix-like operating systems, including:
+
+- Linux distributions (Ubuntu, Debian, CentOS, etc.)
+- macOS
+- WSL (Windows Subsystem for Linux)
+
+Windows users should use WSL or a Unix-like environment to run Haystack.
 
 ## Installation
 
